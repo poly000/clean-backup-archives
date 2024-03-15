@@ -1,0 +1,12 @@
+[package]
+name = "ext-backup-cleanup"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+
+[profile.release]
+lto = true
+strip = true
+opt-level = "z"
