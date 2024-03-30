@@ -10,10 +10,10 @@ use std::{
 use path::BackupFile;
 
 // keep last N archives
-const KEEP_LAST_N_ARCHIVES: usize = 5;
-// keep last N monthly archives (the first archive of a month) in current year
+const KEEP_LAST_N_ARCHIVES: usize = 0;
+// keep last N monthly archives (the first archive of a month)
 // including current month
-const KEEP_LAST_N_MONTHS: usize = 2;
+const KEEP_LAST_N_MONTHS: usize = 5;
 // keep last N annually archives (the first archive of a year)
 // including current year
 const KEEP_LAST_N_YEARS: usize = 3;
@@ -63,30 +63,14 @@ fn backups_to_delete(
 ) -> Result<impl Iterator<Item = BackupFile>, Box<dyn Error>> {
     // year -> backup files
     let mut backfile_map: BTreeMap<u32, Vec<BackupFile>> = BTreeMap::new();
-
     for (year, backup_file) in backup_files.map(|back| (back.year, back)) {
         backfile_map.entry(year).or_default().push(backup_file);
     }
-
     // sort backup files by timestamps in filename
     backfile_map.iter_mut().for_each(|(_, backup_files)| {
         backup_files.sort();
     });
 
-    let current_year = backfile_map
-        .keys()
-        .last()
-        .expect("no backup file was found")
-        .clone();
-
-    let current_month = backfile_map
-        .entry(current_year)
-        .or_default()
-        .last()
-        .unwrap()
-        .month;
-
-    // keep every first backup of a year,
     // keep at most `KEEP_LAST_N_MONTHS` annually backup
     backfile_map
         .iter_mut()
@@ -96,36 +80,33 @@ fn backups_to_delete(
             b[0].keep = true;
         });
 
-    // keep latest 2 archives of at most KEEP_LAST_N_MONTHS
-    // previous months in this year. only keep the first archive
-    // of a month
-    backfile_map.entry(current_year).and_modify(|b| {
-        let mut month_seen: BTreeMap<_, &mut BackupFile> = BTreeMap::new();
-        for backup_file in b.iter_mut().rev() {
+    let mut monthly_backups: BTreeMap<_, &mut BackupFile> = BTreeMap::new();
+    for (year, backups) in backfile_map.iter_mut() {
+        for backup_file in backups.iter_mut().rev() {
             // for every month only the first archive will be kept,
             // as `insert`` will replace previous value.
-            month_seen.insert(backup_file.month, backup_file);
+            monthly_backups.insert((year, backup_file.month), backup_file);
         }
+    }
+    // keep at most `KEEP_LAST_N_MONTHS` monthly archives
+    monthly_backups
+        .into_iter()
+        .rev()
+        .take(KEEP_LAST_N_MONTHS)
+        .for_each(|(_, b)| b.keep = true);
 
-        for (_, backup_file) in month_seen.into_iter().rev().take(KEEP_LAST_N_MONTHS) {
-            backup_file.keep = true;
-        }
-    });
-
-    // keep every archive of this month
-    backfile_map.entry(current_year).and_modify(|b| {
-        b.iter_mut()
-            .filter(|b| b.month == current_month)
-            .for_each(|b| {
-                b.keep = true;
-            });
-    });
+    // keep last N archives
+    backfile_map
+        .iter_mut()
+        .map(|(_, b)| b)
+        .flatten()
+        .rev()
+        .take(KEEP_LAST_N_ARCHIVES)
+        .for_each(|b| b.keep = true);
 
     Ok(backfile_map
         .into_iter()
         .map(|(_, files)| files.into_iter())
         .flatten()
-        .rev()
-        .skip(KEEP_LAST_N_ARCHIVES) // last N archives that always keep
         .filter(|b| b.keep == false))
 }
