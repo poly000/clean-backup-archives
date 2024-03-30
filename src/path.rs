@@ -24,15 +24,7 @@ impl Ord for BackupFile {
 
 impl BackupFile {
     pub fn new(path: PathBuf) -> Option<BackupFile> {
-        let target = path
-            .file_name()?
-            .to_string_lossy()
-            .split('.')
-            .next()?
-            .split_once("target_")?
-            .1
-            .to_string();
-
+        let target = path.file_name()?.to_string_lossy().split('.').next()?.split_once("target_")?.1.to_string();
         let full_time = path.file_name()?.to_string_lossy().split('.').last()?[1..].to_string();
         let (yyyymmdd, _hhmmss) = full_time.split_once('-')?;
 

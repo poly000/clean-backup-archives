@@ -10,6 +10,9 @@ use std::{
 use path::BackupFile;
 
 const PREVIOUS_MONTH_KEEP_FIRST: usize = 2;
+const KEEP_LAST_N_MONTHS: usize = 5;
+const KEEP_LAST_N_YEARS: usize = 5;
+const KEEP_LAST_N_ARCHIVES: usize = 5;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let target_dir = env::args().nth(1).ok_or_else(|| {
@@ -18,12 +21,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     })?;
     let target_dir = PathBuf::from(target_dir);
 
+    target_dir
+        .is_dir()
+        .then_some(())
+        .ok_or("target dir should be a directory")?;
+
     let mut target_backupfiles: HashMap<String, Vec<BackupFile>> = HashMap::new();
     for backup_file in target_dir
         .read_dir()?
         .filter_map(Result::ok)
         .map(|e| e.path())
-        .filter(|p| p.is_file())
         .filter_map(BackupFile::new)
     {
         target_backupfiles
@@ -50,6 +57,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn backups_to_delete(
     backup_files: impl Iterator<Item = BackupFile>,
 ) -> Result<impl Iterator<Item = BackupFile>, Box<dyn Error>> {
+    // year -> backup files
     let mut backfile_map: BTreeMap<u32, Vec<BackupFile>> = BTreeMap::new();
 
     for (year, backup_file) in backup_files.map(|back| (back.year, back)) {
@@ -74,18 +82,24 @@ fn backups_to_delete(
         .unwrap()
         .month;
 
-    // keep every first backup of a year
-    backfile_map.iter_mut().for_each(|(_, b)| {
-        b[0].keep = true;
-    });
+    // keep every first backup of a year,
+    // keep at most `KEEP_LAST_N_MONTHS` yearly backup
+    backfile_map
+        .iter_mut()
+        .take(KEEP_LAST_N_YEARS)
+        .for_each(|(_, b)| {
+            b[0].keep = true;
+        });
 
-    // keep latest 2 archives of previous months in this year
-    // only keep the first archive of a month
+    // keep latest 2 archives of at most KEEP_LAST_N_MONTHS
+    // previous months in this year. only keep the first archive
+    // of a month
     backfile_map.entry(current_year).and_modify(|b| {
         let mut month_seen: BTreeMap<_, &mut BackupFile> = BTreeMap::new();
         for backup_file in b
             .iter_mut()
             .rev()
+            .take(KEEP_LAST_N_MONTHS)
             .skip_while(|bf| bf.month == current_month)
         {
             month_seen.insert(backup_file.month, backup_file);
@@ -109,5 +123,7 @@ fn backups_to_delete(
         .into_iter()
         .map(|(_, files)| files.into_iter())
         .flatten()
+        .rev()
+        .skip(KEEP_LAST_N_ARCHIVES) // last N archives that always keep
         .filter(|b| b.keep == false))
 }
