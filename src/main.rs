@@ -9,7 +9,7 @@ use std::{
 
 use path::BackupFile;
 
-const KEEP_LAST_N_MONTHS: usize = 5;
+const KEEP_LAST_N_MONTHS: usize = 2;
 const KEEP_LAST_N_YEARS: usize = 5;
 const KEEP_LAST_N_ARCHIVES: usize = 5;
 
@@ -85,6 +85,7 @@ fn backups_to_delete(
     // keep at most `KEEP_LAST_N_MONTHS` annually backup
     backfile_map
         .iter_mut()
+        .rev()
         .take(KEEP_LAST_N_YEARS)
         .for_each(|(_, b)| {
             b[0].keep = true;
