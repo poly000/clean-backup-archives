@@ -9,7 +9,6 @@ use std::{
 
 use path::BackupFile;
 
-const PREVIOUS_MONTH_KEEP_FIRST: usize = 2;
 const KEEP_LAST_N_MONTHS: usize = 5;
 const KEEP_LAST_N_YEARS: usize = 5;
 const KEEP_LAST_N_ARCHIVES: usize = 5;
@@ -83,7 +82,7 @@ fn backups_to_delete(
         .month;
 
     // keep every first backup of a year,
-    // keep at most `KEEP_LAST_N_MONTHS` yearly backup
+    // keep at most `KEEP_LAST_N_MONTHS` annually backup
     backfile_map
         .iter_mut()
         .take(KEEP_LAST_N_YEARS)
@@ -99,13 +98,12 @@ fn backups_to_delete(
         for backup_file in b
             .iter_mut()
             .rev()
-            .take(KEEP_LAST_N_MONTHS)
             .skip_while(|bf| bf.month == current_month)
         {
             month_seen.insert(backup_file.month, backup_file);
         }
 
-        for (_, backup_file) in month_seen.into_iter().rev().take(PREVIOUS_MONTH_KEEP_FIRST) {
+        for (_, backup_file) in month_seen.into_iter().rev().take(KEEP_LAST_N_MONTHS) {
             backup_file.keep = true;
         }
     });
