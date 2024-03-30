@@ -9,9 +9,14 @@ use std::{
 
 use path::BackupFile;
 
-const KEEP_LAST_N_MONTHS: usize = 2;
-const KEEP_LAST_N_YEARS: usize = 5;
+// keep last N archives
 const KEEP_LAST_N_ARCHIVES: usize = 5;
+// keep last N monthly archives (the first archive of a month) in current year
+// including current month
+const KEEP_LAST_N_MONTHS: usize = 2;
+// keep last N annually archives (the first archive of a year)
+// including current year
+const KEEP_LAST_N_YEARS: usize = 3;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let target_dir = env::args().nth(1).ok_or_else(|| {
@@ -96,11 +101,9 @@ fn backups_to_delete(
     // of a month
     backfile_map.entry(current_year).and_modify(|b| {
         let mut month_seen: BTreeMap<_, &mut BackupFile> = BTreeMap::new();
-        for backup_file in b
-            .iter_mut()
-            .rev()
-            .skip_while(|bf| bf.month == current_month)
-        {
+        for backup_file in b.iter_mut().rev() {
+            // for every month only the first archive will be kept,
+            // as `insert`` will replace previous value.
             month_seen.insert(backup_file.month, backup_file);
         }
 
